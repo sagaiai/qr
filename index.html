@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>متجر QR - كارفور</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+    <style>
+        :root {
+            --royal-blue: #004a9f;
+            --royal-red: #e20613;
+            --light-blue: #e8f1ff;
+            --light-gray: #f5f5f5;
+            --dark-gray: #333333;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-gray);
+            color: var(--dark-gray);
+            margin: 0;
+            padding: 0;
+            direction: rtl;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--royal-blue);
+            color: white;
+            padding: 15px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background-color: var(--royal-red);
+        }
+        
+        h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+        
+        h2 {
+            color: var(--royal-blue);
+            margin-top: 40px;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        
+        h2::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 3px;
+            background-color: var(--royal-red);
+            margin: 10px auto;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 6px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        button {
+            background-color: var(--royal-blue);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            margin: 15px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #003b7e;
+        }
+        
+        #qrcode {
+            margin: 20px auto;
+            padding: 10px;
+            background-color: white;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        
+        video {
+            border-radius: 10px;
+            border: 3px solid var(--royal-blue);
+            max-width: 100%;
+            margin: 10px 0;
+        }
+        
+        #result {
+            font-size: 1.2rem;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: var(--light-blue);
+            border-radius: 5px;
+            border-right: 5px solid var(--royal-blue);
+            min-height: 30px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        
+        .logo-text {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .logo-red {
+            color: var(--royal-red);
+        }
+        
+        .section {
+            text-align: center;
+        }
+        
+        .confirm-btn {
+            background-color: var(--royal-red);
+            margin-right: 10px;
+        }
+        
+        .confirm-btn:hover {
+            background-color: #c70512;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span class="logo-text">متجر <span class="logo-red">QR</span></span>
+        </div>
+        <h1>نظام إدارة المنتجات والمشتريات</h1>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <h2>إضافة منتج وإنشاء QR Code</h2>
+            <div class="section">
+                <div class="input-group">
+                    <input type="text" id="productName" placeholder="اسم المنتج" required>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="productPrice" placeholder="السعر (درهم)" required>
+                </div>
+                <button onclick="generateQRCode()">إنشاء رمز QR</button>
+                <div id="qrcode"></div>
+                <button id="downloadQR" class="hidden">تحميل رمز QR</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>مسح رمز QR للمنتج</h2>
+            <div class="section">
+                <video id="video" width="300" height="200" autoplay></video>
+                <div>
+                    <button onclick="startScanner()">بدء المسح</button>
+                    <button onclick="stopScanner()" class="hidden" id="stopButton">إيقاف المسح</button>
+                </div>
+                
+                <div id="result"></div>
+                <div class="action-buttons hidden" id="actionButtons">
+                    <button class="confirm-btn" onclick="confirmPurchase()">تأكيد الشراء</button>
+                    <button onclick="cancelPurchase()">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let scanner = null;
+        let currentProduct = null;
+        
+        function generateQRCode() {
+            let name = document.getElementById("productName").value;
+            let price = document.getElementById("productPrice").value;
+            
+            if (!name || !price) {
+                alert("الرجاء إدخال اسم المنتج والسعر");
+                return;
+            }
+            
+            let productData = JSON.stringify({ name, price });
+            document.getElementById("qrcode").innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: productData,
+                width: 200,
+                height: 200,
+                colorDark: "#004a9f",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            document.getElementById("downloadQR").classList.remove("hidden");
+        }
+        
+        function startScanner() {
+            let video = document.getElementById("video");
+            document.getElementById("result").innerText = "جارِ البحث عن رمز QR...";
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    scanner = setInterval(scanFrame, 1000);
+                    document.getElementById("stopButton").classList.remove("hidden");
+                })
+                .catch(err => {
+                    document.getElementById("result").innerText = "خطأ: لا يمكن الوصول إلى الكاميرا";
+                    console.error(err);
+                });
+        }
+        
+        function stopScanner() {
+            if (scanner) {
+                clearInterval(scanner);
+                scanner = null;
+            }
+            
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            document.getElementById("stopButton").classList.add("hidden");
+        }
+        
+        function scanFrame() {
+            let video = document.getElementById("video");
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                let canvas = document.createElement("canvas");
+                let context = canvas.getContext("2d");
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                let code = jsQR(imageData.data, canvas.width, canvas.height);
+                
+                if (code) {
+                    try {
+                        currentProduct = JSON.parse(code.data);
+                        document.getElementById("result").innerText = `تم العثور على منتج: ${currentProduct.name} بسعر ${currentProduct.price} درهم`;
+                        document.getElementById("actionButtons").classList.remove("hidden");
+                        stopScanner();
+                    } catch (e) {
+                        document.getElementById("result").innerText = "رمز QR غير صالح";
+                    }
+                }
+            }
+        }
+        
+        function confirmPurchase() {
+            if (currentProduct) {
+                document.getElementById("result").innerText = `تم شراء ${currentProduct.name} بنجاح! سعر: ${currentProduct.price} درهم`;
+                document.getElementById("actionButtons").classList.add("hidden");
+                currentProduct = null;
+            }
+        }
+        
+        function cancelPurchase() {
+            document.getElementById("result").innerText = "تم إلغاء عملية الشراء";
+            document.getElementById("actionButtons").classList.add("hidden");
+            currentProduct = null;
+        }
+        
+        // Handle download QR code
+        document.getElementById("downloadQR").addEventListener("click", function() {
+            const qrCanvas = document.querySelector("#qrcode canvas");
+            if (qrCanvas) {
+                const link = document.createElement('a');
+                link.download = 'QRCode-' + document.getElementById("productName").value + '.png';
+                link.href = qrCanvas.toDataURL("image/png");
+                link.click();
+            }
+        });
+    </script>
+</body>
+</html>
