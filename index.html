@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>متجر QR - كارفور</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+    <!-- استخدام أحدث إصدار من مكتبة jsQR -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
             --royal-blue: #004a9f;
@@ -119,11 +120,30 @@
             display: inline-block;
         }
         
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        #scannerOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--royal-blue);
+            box-sizing: border-box;
+            z-index: 1;
+        }
+        
         video {
             border-radius: 10px;
             border: 3px solid var(--royal-blue);
             max-width: 100%;
             margin: 10px 0;
+            display: block;
         }
         
         #result {
@@ -175,6 +195,15 @@
             justify-content: center;
             margin-top: 15px;
         }
+        
+        .camera-error {
+            color: var(--royal-red);
+            font-weight: bold;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -204,7 +233,13 @@
         <div class="card">
             <h2>مسح رمز QR للمنتج</h2>
             <div class="section">
-                <video id="video" width="300" height="200" autoplay></video>
+                <div id="videoContainer">
+                    <video id="video" width="300" height="200" autoplay muted playsinline></video>
+                    <div id="scannerOverlay" class="hidden"></div>
+                </div>
+                <div id="cameraErrorMessage" class="camera-error hidden">
+                    لا يمكن الوصول إلى الكاميرا. تأكد من منح الإذن للموقع لاستخدام الكاميرا.
+                </div>
                 <div>
                     <button onclick="startScanner()">بدء المسح</button>
                     <button onclick="stopScanner()" class="hidden" id="stopButton">إيقاف المسح</button>
@@ -222,6 +257,28 @@
     <script>
         let scanner = null;
         let currentProduct = null;
+        let video = document.getElementById("video");
+        let canvasElement = document.createElement("canvas");
+        let canvas = canvasElement.getContext("2d");
+        
+        // تحقق من توفر الكاميرا والمكتبات اللازمة
+        function checkRequirements() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                document.getElementById("cameraErrorMessage").textContent = 
+                    "متصفحك لا يدعم الوصول إلى الكاميرا. يرجى استخدام متصفح أحدث.";
+                document.getElementById("cameraErrorMessage").classList.remove("hidden");
+                return false;
+            }
+            
+            if (typeof jsQR !== 'function') {
+                document.getElementById("cameraErrorMessage").textContent = 
+                    "لم يتم تحميل مكتبة jsQR بشكل صحيح. يرجى تحديث الصفحة.";
+                document.getElementById("cameraErrorMessage").classList.remove("hidden");
+                return false;
+            }
+            
+            return true;
+        }
         
         function generateQRCode() {
             let name = document.getElementById("productName").value;
@@ -247,57 +304,79 @@
         }
         
         function startScanner() {
-            let video = document.getElementById("video");
-            document.getElementById("result").innerText = "جارِ البحث عن رمز QR...";
+            if (!checkRequirements()) return;
             
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            document.getElementById("result").innerText = "جارِ البحث عن رمز QR...";
+            document.getElementById("cameraErrorMessage").classList.add("hidden");
+            document.getElementById("scannerOverlay").classList.remove("hidden");
+            
+            // استخدام الكاميرا الخلفية إن أمكن
+            const constraints = {
+                video: { 
+                    facingMode: "environment",
+                    width: { ideal: 720 },
+                    height: { ideal: 480 }
+                }
+            };
+            
+            navigator.mediaDevices.getUserMedia(constraints)
                 .then(stream => {
                     video.srcObject = stream;
-                    scanner = setInterval(scanFrame, 1000);
+                    video.setAttribute("playsinline", true); // لأجهزة iOS
+                    video.play();
                     document.getElementById("stopButton").classList.remove("hidden");
+                    requestAnimationFrame(tick);
                 })
                 .catch(err => {
+                    console.error("Error accessing camera:", err);
+                    document.getElementById("cameraErrorMessage").classList.remove("hidden");
                     document.getElementById("result").innerText = "خطأ: لا يمكن الوصول إلى الكاميرا";
-                    console.error(err);
                 });
         }
         
         function stopScanner() {
-            if (scanner) {
-                clearInterval(scanner);
-                scanner = null;
-            }
-            
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
             }
             
+            document.getElementById("scannerOverlay").classList.add("hidden");
             document.getElementById("stopButton").classList.add("hidden");
+            scanner = null;
         }
         
-        function scanFrame() {
-            let video = document.getElementById("video");
+        function tick() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                let canvas = document.createElement("canvas");
-                let context = canvas.getContext("2d");
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvasElement.height = video.videoHeight;
+                canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
                 
-                let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                let code = jsQR(imageData.data, canvas.width, canvas.height);
-                
-                if (code) {
-                    try {
-                        currentProduct = JSON.parse(code.data);
-                        document.getElementById("result").innerText = `تم العثور على منتج: ${currentProduct.name} بسعر ${currentProduct.price} درهم`;
-                        document.getElementById("actionButtons").classList.remove("hidden");
-                        stopScanner();
-                    } catch (e) {
-                        document.getElementById("result").innerText = "رمز QR غير صالح";
+                let imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                try {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+                    
+                    if (code) {
+                        try {
+                            console.log("QR Code detected:", code.data);
+                            currentProduct = JSON.parse(code.data);
+                            document.getElementById("result").innerText = `تم العثور على منتج: ${currentProduct.name} بسعر ${currentProduct.price} درهم`;
+                            document.getElementById("actionButtons").classList.remove("hidden");
+                            stopScanner();
+                            return;
+                        } catch (e) {
+                            console.error("Error parsing QR code data:", e);
+                            document.getElementById("result").innerText = "رمز QR غير صالح";
+                        }
                     }
+                } catch (error) {
+                    console.error("Error processing frame:", error);
                 }
+            }
+            
+            if (video.srcObject) {
+                requestAnimationFrame(tick);
             }
         }
         
